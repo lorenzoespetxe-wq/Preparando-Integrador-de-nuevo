@@ -390,7 +390,7 @@ def _seed_example_data(session: Session) -> None:
         stock_actual=5,
         stock_minimo=1,
         costo_unitario=Decimal("150"),
-        unidad_medida=UnidadEnum.LITROS,
+        unidad_medida=UnidadEnum.MILILITROS,
     )
     session.add_all([ingrediente_muzza, ingrediente_aceite])
     session.flush()

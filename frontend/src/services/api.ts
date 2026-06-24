@@ -48,8 +48,14 @@ api.interceptors.response.use(
     if (typeof data === "string" && data.trim()) {
       return Promise.reject(new Error(data));
     }
-    if (data && typeof data === "object" && "detail" in data) {
-      return Promise.reject(new Error(String((data as { detail: unknown }).detail)));
+    if (data && typeof data === "object") {
+      if ("detail" in data) {
+        return Promise.reject(new Error(String((data as { detail: unknown }).detail)));
+      }
+      const errData = data as Record<string, unknown>;
+      if (errData.error && typeof errData.error === "object" && "message" in (errData.error as Record<string, unknown>)) {
+        return Promise.reject(new Error(String((errData.error as Record<string, unknown>).message)));
+      }
     }
 
     return Promise.reject(new Error(`Error ${error.response.status} en la API`));

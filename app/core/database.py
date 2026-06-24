@@ -83,6 +83,21 @@ def _resize_varchar_if_needed(connection, table: str, column: str, new_type: str
     connection.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE {new_type}"))
 
 
+def _drop_unidad_medida_check_constraint(connection) -> None:
+    """Eliminar CHECK constraint de ingredientes.unidad_medida para permitir nuevos valores del enum.
+    Solo aplica a PostgreSQL; SQLite recrea la tabla desde cero al iniciar."""
+    if not _is_postgres:
+        return
+    inspector = inspect(connection)
+    if "ingredientes" not in inspector.get_table_names():
+        return
+    for constraint in inspector.get_check_constraints("ingredientes"):
+        if constraint.get("sqltext") and "unidad_medida" in constraint["sqltext"]:
+            constraint_name = constraint.get("name")
+            if constraint_name:
+                connection.execute(text(f"ALTER TABLE ingredientes DROP CONSTRAINT IF EXISTS {constraint_name}"))
+
+
 def _migrate_legacy_schema() -> None:
     """Aplicar ajustes mínimos sobre tablas existentes sin migraciones formales.
     Cada operación DDL se ejecuta en su propia transacción para compatibilidad
@@ -168,6 +183,12 @@ def _migrate_legacy_schema() -> None:
             conn.execute(
                 text("UPDATE ingredientes SET unidad_medida = 'mililitros' WHERE unidad_medida = 'litros'")
             )
+            _drop_unidad_medida_check_constraint(conn)
+
+    # Extender CHECK constraint de ingredientes.unidad_medida para nuevos valores
+    with engine.begin() as conn:
+        if "ingredientes" in inspect(conn).get_table_names():
+            _drop_unidad_medida_check_constraint(conn)
 
 
 _ESTADO_INFO = {

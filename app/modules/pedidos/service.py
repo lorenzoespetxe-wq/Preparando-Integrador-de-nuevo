@@ -23,7 +23,7 @@ from app.core.rbac import (
     normalize_role,
     normalize_state,
 )
-from app.core.stock_utils import aplicar_stock
+
 from app.core.sse import sse_manager
 from app.core.websocket import manager
 from app.modules.pedidos.events import (
@@ -83,10 +83,78 @@ class PedidoService:
         (STATE_PENDIENTE, STATE_ENTREGADO): "discount",
     }
 
+    @staticmethod
+    def _aplicar_stock_static(session: Session, producto_id: int, cantidad: int, multiplicador: int = 1) -> None:
+        from app.modules.productos.repository import ProductoRepository
+        producto_repo = ProductoRepository(session)
+        producto = producto_repo.get_by_id(producto_id)
+        if not producto:
+            return
+        if producto.stock_manual is not None:
+            delta = multiplicador * cantidad
+            if multiplicador == 1 and producto.stock_manual is not None and producto.stock_manual - delta < 0:
+                raise ValueError(f"Stock insuficiente para {producto.nombre}")
+            producto.stock_manual -= delta
+            session.add(producto)
+        else:
+            ingredientes = list(producto.productos_ingredientes)
+            if ingredientes:
+                for pi in ingredientes:
+                    ing = pi.ingrediente
+                    if ing:
+                        delta = float(pi.cantidad) * cantidad * multiplicador
+                        if multiplicador == 1 and ing.stock_actual - delta < 0:
+                            raise ValueError(
+                                f"Stock insuficiente de '{ing.nombre}' para {producto.nombre}"
+                            )
+                        ing.stock_actual -= delta
+                        session.add(ing)
+
     def _aplicar_stock(
         self, uow: PedidoUnitOfWork, producto_id: int, cantidad: int, multiplicador: int = 1
     ) -> None:
-        aplicar_stock(uow._session, producto_id, cantidad, multiplicador)
+        try:
+            PedidoService._aplicar_stock_static(uow._session, producto_id, cantidad, multiplicador)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    @staticmethod
+    def _verificar_stock_ingredientes(session: Session, producto_id: int, cantidad: int) -> Optional[str]:
+        from app.modules.productos.models import Producto
+        producto = session.get(Producto, producto_id)
+        if not producto:
+            return "Producto no encontrado"
+        if producto.usa_stock_manual:
+            if producto.stock_manual is not None and producto.stock_manual < cantidad:
+                return f"Stock insuficiente para {producto.nombre}"
+            return None
+        for pi in producto.productos_ingredientes:
+            ing = pi.ingrediente
+            if ing:
+                needed = float(pi.cantidad) * cantidad
+                if ing.stock_actual < needed:
+                    return (
+                        f"Ingrediente '{ing.nombre}' insuficiente: "
+                        f"se necesitan {needed:.2f} {ing.unidad_medida.value}, "
+                        f"hay {ing.stock_actual:.2f}"
+                    )
+        return None
+
+    @staticmethod
+    def descontar_stock_pedido(session: Session, pedido_id: int, multiplicador: int = 1) -> None:
+        from app.modules.pedidos.detalle_pedido_repository import DetallePedidoRepository
+        detalle_repo = DetallePedidoRepository(session)
+        detalles = detalle_repo.get_by_pedido_id(pedido_id)
+        if multiplicador == 1:
+            for detalle in detalles:
+                error = PedidoService._verificar_stock_ingredientes(session, detalle.producto_id, detalle.cantidad)
+                if error:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        for detalle in detalles:
+            try:
+                PedidoService._aplicar_stock_static(session, detalle.producto_id, detalle.cantidad, multiplicador)
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -167,10 +235,18 @@ class PedidoService:
                         detail=f"Producto {producto.nombre} no disponible",
                     )
 
-                if producto.stock_manual is not None and producto.stock_manual < detalle_data.cantidad:
+                if producto.stock_manual is not None:
+                    if producto.stock_manual < detalle_data.cantidad:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Stock insuficiente para {producto.nombre}",
+                        )
+                else:
+                    error = PedidoService._verificar_stock_ingredientes(uow._session, producto.id, detalle_data.cantidad)
+                    if error:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Stock insuficiente de {producto.nombre}",
                         )
 
                 subtotal_detalle = producto.precio_base * Decimal(detalle_data.cantidad)
@@ -274,11 +350,19 @@ class PedidoService:
                         detail=f"Producto {producto.nombre} no disponible",
                     )
 
-                if producto.stock_manual is not None and producto.stock_manual < detalle_data.cantidad:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Stock insuficiente para {producto.nombre}",
-                    )
+                if producto.stock_manual is not None:
+                    if producto.stock_manual < detalle_data.cantidad:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Stock insuficiente para {producto.nombre}",
+                        )
+                else:
+                    error = PedidoService._verificar_stock_ingredientes(uow._session, producto.id, detalle_data.cantidad)
+                    if error:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Stock insuficiente de {producto.nombre}",
+                        )
 
                 subtotal_detalle = producto.precio_base * Decimal(detalle_data.cantidad)
                 detalles_list.append({

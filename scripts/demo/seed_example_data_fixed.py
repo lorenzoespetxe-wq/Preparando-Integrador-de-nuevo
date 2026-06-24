@@ -167,7 +167,7 @@ def main() -> None:
             10000,
             2000,
             Decimal("0.0010"),
-            UnidadEnum.LITROS,
+            UnidadEnum.MILILITROS,
         )
 
         upsert_producto(

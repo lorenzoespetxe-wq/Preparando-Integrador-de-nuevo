@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Modal } from "../components/Modal";
 import { useProductosWS } from "../hooks/useProductosWS";
 import type { Categoria, CategoriaCreate, CategoriaUpdate } from "../models/Categoria";
-import type { Ingrediente, IngredienteCreate, IngredienteUpdate, UnidadMedida } from "../models/Ingrediente";
+import type { Ingrediente, IngredienteCreate, IngredienteUpdate, UnidadMedida, UnidadMedidaEnum } from "../models/Ingrediente";
 import type { Producto, ProductoCreate, ProductoIngrediente, ProductoUpdate } from "../models/Producto";
 import {
   categoriaService,
@@ -305,6 +305,10 @@ function ProductoIngredientsEditor({
     for (const u of unidadesDisponibles) {
       if (u.nombre === "Gramo") mapa["gramos"] = u.id;
       if (u.nombre === "Mililitro") mapa["mililitros"] = u.id;
+      if (u.nombre === "Kilogramo") mapa["kilos"] = u.id;
+      if (u.nombre === "Litro") mapa["litros"] = u.id;
+      if (u.nombre === "Unidad") mapa["unidades"] = u.id;
+      if (u.nombre === "Porción") mapa["porciones"] = u.id;
     }
     return mapa;
   }, [unidadesDisponibles]);
@@ -543,6 +547,10 @@ function IngredienteFormExtra({
         >
           <option value="gramos">gramos</option>
           <option value="mililitros">mililitros</option>
+          <option value="kilos">kilos</option>
+          <option value="litros">litros</option>
+          <option value="unidades">unidades</option>
+          <option value="porciones">porciones</option>
         </select>
       </label>
     </div>
@@ -1245,7 +1253,7 @@ const ingredienteConfig: EntityConfig<Ingrediente, IngredienteCreate, Ingredient
     stock_actual: Number(form.stock_actual ?? 0),
     stock_minimo: Number(form.stock_minimo ?? 0),
     costo_unitario: Number(form.costo_unitario ?? 0),
-    unidad_medida: (form.unidad_medida as "gramos" | "mililitros") ?? "gramos",
+    unidad_medida: (form.unidad_medida as UnidadMedidaEnum) ?? "gramos",
   }),
   toUpdate: (form) => ({
     nombre: form.nombre,
@@ -1254,7 +1262,7 @@ const ingredienteConfig: EntityConfig<Ingrediente, IngredienteCreate, Ingredient
     stock_actual: Number(form.stock_actual ?? 0),
     stock_minimo: Number(form.stock_minimo ?? 0),
     costo_unitario: Number(form.costo_unitario ?? 0),
-    unidad_medida: (form.unidad_medida as "gramos" | "mililitros") ?? "gramos",
+    unidad_medida: (form.unidad_medida as UnidadMedidaEnum) ?? "gramos",
   }),
   renderFormExtra: ({ form, setForm }) => <IngredienteFormExtra form={form} setForm={setForm} />,
 };

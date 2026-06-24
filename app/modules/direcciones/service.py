@@ -5,7 +5,6 @@ from sqlmodel import Session
 
 from app.core.deps import get_current_active_user
 from app.modules.direcciones.models import DireccionEntrega
-from app.modules.direcciones.repository import DireccionEntregaRepository
 from app.modules.direcciones.schemas import (
     DireccionEntregaCreate,
     DireccionEntregaUpdate,
@@ -74,25 +73,25 @@ class DireccionService:
         return result
 
     def get_direccion(self, usuario_id: int, direccion_id: int) -> DireccionEntregaPublic:
-        repo = DireccionEntregaRepository(self._session)
-        direccion = repo.get_by_id(direccion_id)
-        if not direccion or direccion.usuario_id != usuario_id or not direccion.activo:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dirección no encontrada",
-            )
+        with DireccionUnitOfWork(self._session) as uow:
+            direccion = uow.direcciones.get_by_id(direccion_id)
+            if not direccion or direccion.usuario_id != usuario_id or not direccion.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Dirección no encontrada",
+                )
 
-        return self._direccion_to_public(direccion)
+            return self._direccion_to_public(direccion)
 
     def list_direcciones(self, usuario_id: int, offset: int = 0, limit: int = 20) -> DireccionEntregaList:
-        repo = DireccionEntregaRepository(self._session)
-        direcciones = repo.get_by_usuario_id(usuario_id, offset=offset, limit=limit)
-        total = len(direcciones)
+        with DireccionUnitOfWork(self._session) as uow:
+            direcciones = uow.direcciones.get_by_usuario_id(usuario_id, offset=offset, limit=limit)
+            total = len(direcciones)
 
-        return DireccionEntregaList(
-            data=[self._direccion_to_public(d) for d in direcciones],
-            total=total,
-        )
+            return DireccionEntregaList(
+                data=[self._direccion_to_public(d) for d in direcciones],
+                total=total,
+            )
 
     def update_direccion(
         self,

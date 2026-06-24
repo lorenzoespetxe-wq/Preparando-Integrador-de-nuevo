@@ -8,8 +8,6 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlmodel import Session
 
-from app.modules.usuarios.repository import UsuarioRepository
-
 from app.modules.usuarios.models import Usuario
 from app.modules.direcciones.models import DireccionEntrega
 from app.modules.usuarios.unit_of_work import UsuarioUnitOfWork
@@ -49,15 +47,15 @@ class UsuarioService:
         Raises:
             HTTPException: Si usuario no existe o está inactivo
         """
-        repo = UsuarioRepository(self._session)
-        usuario = repo.get_by_id(usuario_id)
-        if not usuario or not usuario.activo or usuario.deleted_at is not None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Usuario no encontrado",
-            )
-        
-        return self._to_detail(usuario)
+        with UsuarioUnitOfWork(self._session) as uow:
+            usuario = uow.usuarios.get_by_id(usuario_id)
+            if not usuario or not usuario.activo or usuario.deleted_at is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Usuario no encontrado",
+                )
+            
+            return self._to_detail(usuario)
 
     def list_usuarios(
         self,
@@ -76,18 +74,18 @@ class UsuarioService:
         Returns:
             Lista paginada de usuarios
         """
-        repo = UsuarioRepository(self._session)
-        usuarios = repo.get_paginated(
-            offset=offset,
-            limit=limit,
-            include_inactive=include_inactive,
-        )
-        total = repo.count(include_inactive=include_inactive)
-        
-        return UsuarioList(
-            data=[self._to_public(u) for u in usuarios],
-            total=total,
-        )
+        with UsuarioUnitOfWork(self._session) as uow:
+            usuarios = uow.usuarios.get_paginated(
+                offset=offset,
+                limit=limit,
+                include_inactive=include_inactive,
+            )
+            total = uow.usuarios.count(include_inactive=include_inactive)
+            
+            return UsuarioList(
+                data=[self._to_public(u) for u in usuarios],
+                total=total,
+            )
 
     def update_usuario(self, usuario_id: int, data: UsuarioUpdate) -> UsuarioDetail:
         """

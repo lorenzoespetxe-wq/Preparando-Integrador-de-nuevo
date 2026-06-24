@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 class UnidadEnum(str, Enum):
     """Unidades de medida para ingredientes."""
     GRAMOS = "gramos"
-    LITROS = "mililitros"
+    MILILITROS = "mililitros"
+    KILOS = "kilos"
+    LITROS = "litros"
+    UNIDADES = "unidades"
+    PORCIONES = "porciones"
 
 
 class ProductoIngrediente(SQLModel, table=True):

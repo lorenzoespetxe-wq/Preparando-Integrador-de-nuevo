@@ -12,7 +12,7 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.rbac import STATE_CONFIRMADO, STATE_PENDIENTE, normalize_role, ROLE_ADMIN, ROLE_PEDIDOS
 from app.core.sse import sse_manager
-from app.core.stock_utils import descontar_stock_pedido
+from app.modules.pedidos.service import PedidoService
 from app.core.websocket import manager
 from app.modules.payments.models import Pago
 from app.modules.pedidos.models import Pedido
@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 def _schedule_avance_en_prep(pedido_id: int) -> None:
     """Programa avance automático CONFIRMADO → EN_PREP a los 3 s."""
-    from app.modules.pedidos.service import PedidoService
     PedidoService._schedule_avance_en_prep(pedido_id)
 
 
@@ -416,7 +415,7 @@ class PaymentService:
                         pedido.forma_pago_codigo = "MERCADOPAGO"
                         pedido.updated_at = datetime.now(timezone.utc)
                         uow.pedidos.add(pedido)
-                        descontar_stock_pedido(self._session, pedido.id)
+                        PedidoService.descontar_stock_pedido(self._session, pedido.id)
                         logger.info(
                             "Webhook: pedido %s actualizado a PAGADO, stock descontado",
                             pedido.id,
@@ -523,7 +522,7 @@ class PaymentService:
                         pedido.forma_pago_codigo = "MERCADOPAGO"
                         pedido.updated_at = datetime.now(timezone.utc)
                         uow.pedidos.add(pedido)
-                        descontar_stock_pedido(self._session, pedido.id)
+                        PedidoService.descontar_stock_pedido(self._session, pedido.id)
                         broadcast_event = EVENT_PAGO_CONFIRMADO
                         broadcast_estado_nuevo = STATE_CONFIRMADO
                     elif nuevo_estado == "rechazado":
@@ -612,7 +611,7 @@ class PaymentService:
                 pedido.estado_codigo = STATE_CONFIRMADO
                 pedido.updated_at = datetime.now(timezone.utc)
                 uow.pedidos.add(pedido)
-                descontar_stock_pedido(self._session, pedido.id)
+                PedidoService.descontar_stock_pedido(self._session, pedido.id)
                 broadcast_event = EVENT_PAGO_CONFIRMADO
                 broadcast_estado_nuevo = STATE_CONFIRMADO
             elif nuevo_estado == "rechazado":

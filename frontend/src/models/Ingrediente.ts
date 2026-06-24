@@ -1,3 +1,5 @@
+export type UnidadMedidaEnum = "gramos" | "mililitros" | "kilos" | "litros" | "unidades" | "porciones";
+
 export interface Ingrediente {
   id: number;
   nombre: string;
@@ -6,7 +8,7 @@ export interface Ingrediente {
   stock_actual: number;
   stock_minimo: number;
   costo_unitario: number;
-  unidad_medida: "gramos" | "mililitros";
+  unidad_medida: UnidadMedidaEnum;
   activo: boolean;
   deleted_at: string | null;
 }
@@ -18,7 +20,7 @@ export interface IngredienteCreate {
   stock_actual: number;
   stock_minimo: number;
   costo_unitario: number;
-  unidad_medida: "gramos" | "mililitros";
+  unidad_medida: UnidadMedidaEnum;
 }
 
 export interface IngredienteUpdate {
@@ -28,7 +30,7 @@ export interface IngredienteUpdate {
   stock_actual?: number;
   stock_minimo?: number;
   costo_unitario?: number;
-  unidad_medida?: "gramos" | "mililitros";
+  unidad_medida?: UnidadMedidaEnum;
 }
 
 export interface IngredienteProductoUso {

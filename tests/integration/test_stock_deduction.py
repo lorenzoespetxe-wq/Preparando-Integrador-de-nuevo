@@ -301,15 +301,8 @@ class TestStockDeductionFlow:
                 "detalles": [{"producto_id": prod_id, "cantidad": 1}],
             },
         )
-        assert r.status_code == 201
-        pedido_id = r.json()["id"]
-
-        r = client.patch(
-            f"/api/v1/pedidos/{pedido_id}/confirmar",
-            headers=cliente_auth_headers,
-            json={},
-        )
-        assert r.status_code == 500, r.text
+        assert r.status_code == 400, r.text
+        assert "Stock insuficiente de Pizza Insuficiente Test" in r.text
 
         with Session(engine_test) as s:
             ing = s.get(Ingrediente, ing_id)
