@@ -300,11 +300,14 @@ function ProductoIngredientsEditor({
   });
 
   const unidadesDisponibles = useMemo<UnidadMedida[]>(() => unidadesQuery.data ?? [], [unidadesQuery.data]);
-  const unidadDefaultId = unidadesDisponibles[0]?.id ?? 0;
-  const unidadesPorId = useMemo(
-    () => new Map(unidadesDisponibles.map((u) => [u.id, u])),
-    [unidadesDisponibles]
-  );
+  const enumAUnidadMedidaId = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    for (const u of unidadesDisponibles) {
+      if (u.nombre === "Gramo") mapa["gramos"] = u.id;
+      if (u.nombre === "Mililitro") mapa["mililitros"] = u.id;
+    }
+    return mapa;
+  }, [unidadesDisponibles]);
 
   const ingredientesDisponibles = ingredientesQuery.data?.data ?? [];
   const ingredientesSeleccionados = (form.ingredientes as ProductoIngrediente[] | undefined) ?? [];
@@ -339,9 +342,8 @@ function ProductoIngredientsEditor({
     const nuevaFila: ProductoIngrediente = {
       ingrediente_id: nextIngrediente.id,
       cantidad: 1,
-      unidad_medida_id: unidadDefaultId,
+      unidad_medida_id: enumAUnidadMedidaId[nextIngrediente.unidad_medida] ?? 0,
       es_removible: true,
-      es_opcional: false,
     };
 
     setForm((previous) => ({
@@ -373,10 +375,8 @@ function ProductoIngredientsEditor({
       ) : ingredientesSeleccionados.length > 0 ? (
         <div className="space-y-3 rounded border border-orange-100 bg-white p-2">
           {ingredientesSeleccionados.map((ingrediente, index) => {
-            const unidadSimbolo =
-              unidadesPorId.get(ingrediente.unidad_medida_id)?.simbolo ?? ingrediente.unidad_simbolo ?? "";
             return (
-              <div key={`${ingrediente.ingrediente_id}-${index}`} className="grid gap-2 rounded bg-orange-50 p-3 md:grid-cols-2 lg:grid-cols-[2fr,1fr,1fr,auto,auto,auto]">
+              <div key={`${ingrediente.ingrediente_id}-${index}`} className="grid gap-2 rounded bg-orange-50 p-3 md:grid-cols-2 lg:grid-cols-[2fr,1fr,auto,auto]">
                 <div className="min-w-0">
                   <input
                     type="text"
@@ -399,7 +399,11 @@ function ProductoIngredientsEditor({
                         return;
                       }
 
-                      updateRow(index, { ingrediente_id: nextId });
+                      const ingSel = ingredientesPorId.get(nextId);
+                      updateRow(index, {
+                        ingrediente_id: nextId,
+                        unidad_medida_id: ingSel ? (enumAUnidadMedidaId[ingSel.unidad_medida] ?? 0) : 0,
+                      });
                       setIngredienteSearch((prev) => ({ ...prev, [index]: "" }));
                     }}
                   >
@@ -417,35 +421,22 @@ function ProductoIngredientsEditor({
                   </select>
                 </div>
 
-                <input
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  className="min-w-0 rounded border border-orange-200 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none"
-                  value={ingrediente.cantidad}
-                  onChange={(event) => updateRow(index, { cantidad: Number(event.target.value) || 0 })}
-                />
-
-                <select
-                  className="min-w-0 rounded border border-orange-200 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none"
-                  value={ingrediente.unidad_medida_id}
-                  onChange={(event) => updateRow(index, { unidad_medida_id: Number(event.target.value) })}
-                >
-                  {unidadesDisponibles.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.simbolo} — {u.nombre}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="min-w-0 flex items-center gap-2 rounded border border-orange-200 bg-white px-3 py-2 text-sm">
+                <div className="flex flex-col gap-1">
                   <input
-                    type="checkbox"
-                    checked={ingrediente.es_opcional}
-                    onChange={(event) => updateRow(index, { es_opcional: event.target.checked })}
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    className="min-w-0 rounded border border-orange-200 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none"
+                    value={ingrediente.cantidad}
+                    onChange={(event) => updateRow(index, { cantidad: Number(event.target.value) || 0 })}
                   />
-                  <span>Opcional</span>
-                </label>
+                  <span className="text-xs text-orange-400">
+                    {(() => {
+                      const ingSel = ingredientesPorId.get(ingrediente.ingrediente_id);
+                      return ingSel ? ingSel.unidad_medida : "";
+                    })()}
+                  </span>
+                </div>
 
                 <label className="min-w-0 flex items-center gap-2 rounded border border-orange-200 bg-white px-3 py-2 text-sm">
                   <input
@@ -463,10 +454,6 @@ function ProductoIngredientsEditor({
                 >
                   Quitar
                 </button>
-
-                <p className="text-xs text-orange-400 md:col-span-2 lg:col-span-6">
-                  Unidad: {unidadSimbolo}
-                </p>
               </div>
             );
           })}
